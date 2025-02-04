@@ -1,0 +1,8 @@
+{
+  "vocabulary_size": 256,
+  "avg_inference_sec": 5.9557e-05,
+  "dataset.split_ratio": 0.2,
+  "support_vector_count": 161,
+  "dataset_size.class_0": 210,
+  "dataset_size.class_1": 200
+}

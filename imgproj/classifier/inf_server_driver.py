@@ -20,7 +20,7 @@ def decode_jpeg(b64_str: str) -> np.ndarray:
     )
 
 
-class MLflowModel:
+class InferenceServerDriver:
     def __init__(self):
         self.session = ImgProjSession()
 

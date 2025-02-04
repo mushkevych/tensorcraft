@@ -9,6 +9,7 @@ __pycache__/
 # trained binary models
 *.weights
 *.onnx
+vocabulary.json
 
 # Distribution / packaging
 .Python

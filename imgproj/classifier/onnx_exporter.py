@@ -5,11 +5,9 @@ import torch.onnx
 from imgproj.classifier.img_classifier import ImgClassifier
 from imgproj.classifier.img_configuration import ModelConf
 
-MLFLOW_TRACKING_URI = 'https://dev.mycompany.com/mlflow'
 TMPL_ONNX_FILE_NAME = '{0}.{1}px.onnx'
 TMPL_EVAL_METRICS_FILE_NAME = 'evaluation_metrics.{0}.{1}px.json'
 TMPL_SYS_METRICS_FILE_NAME = 'system_metrics.{0}.{1}px.json'
-TMPL_MODEL_NAME = 'image_classifier.imgproj.{0}.{1}px'
 TMPL_WEIGHTS_FILE_NAME = '{0}.{1}px.weights'
 
 COMPUTE_DEVICE_CPU = torch.device('cpu')
