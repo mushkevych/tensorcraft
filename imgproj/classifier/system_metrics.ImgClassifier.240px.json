@@ -1,6 +1,6 @@
 {
   "input_size": 57600,
-  "avg_inference_sec": 0.03976184,
+  "avg_inference_sec": 0.040834471,
   "parameter_count": 4008253,
   "dataset.split_ratio": 0.2,
   "dataset_size.class_0": 250,

@@ -30,12 +30,12 @@ class TxtDataset:
 
     def __getitem__(self, idx: int) -> tuple[np.ndarray, np.float32]:
         # Ensure that features are in the correct order and dtype is np.float32
-        features = self.df.iloc[idx][self.feature_names].apply(concat_row_elements, axis=1).astype(dtype=np.float32)
+        np_features = self.df.iloc[idx][self.feature_names].apply(concat_row_elements, axis=1).astype(dtype=np.float32)
 
         # Get the label as a scalar value, assuming binary classification
         label = self.df.iloc[idx]['label'].astype(dtype=np.float32)
 
-        return features, label
+        return np_features, label
 
     def get_data(self) -> tuple[np.ndarray, np.ndarray]:
         """
@@ -43,6 +43,6 @@ class TxtDataset:
 
         :return: A tuple of (features, labels), where each is a numpy array.
         """
-        features = self.df[self.feature_names].apply(concat_row_elements, axis=1).to_list()
-        labels = self.df['label'].values.astype(dtype=np.float32)
-        return features, labels
+        np_features = self.df[self.feature_names].apply(concat_row_elements, axis=1).to_list()
+        np_labels = self.df['label'].values.astype(dtype=np.float32)
+        return np_features, np_labels

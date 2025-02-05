@@ -11,6 +11,9 @@ __pycache__/
 *.onnx
 vocabulary.json
 
+# private keys
+.hugging_face.token
+
 # Distribution / packaging
 .Python
 build/

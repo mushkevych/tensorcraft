@@ -15,12 +15,10 @@ class ImgDataset(Dataset):
 
     def __getitem__(self, idx: int) -> tuple[Tensor, Tensor]:
         # Get the grayscale image (stored as ndarray)
-        img_grey = self.df.iloc[idx]['img_grey']
-
-        # Convert the image to a torch Tensor
-        img_tensor = torch.tensor(img_grey, dtype=torch.float32).unsqueeze(0)  # Add channel dimension (1)
+        np_img_grey = self.df.iloc[idx]['img_grey']
+        pt_img_grey = torch.tensor(np_img_grey, dtype=torch.float32).unsqueeze(0)  # Add channel dimension (1)
 
         # Get the label (0 or 1)
-        label = torch.tensor(self.df.iloc[idx]['label'], dtype=torch.float32).unsqueeze(0)  # Add extra dimension for Criterion conformity
+        pt_label = torch.tensor(self.df.iloc[idx]['label'], dtype=torch.float32).unsqueeze(0)  # Add extra dimension for Criterion conformity
 
-        return img_tensor, label
+        return pt_img_grey, pt_label

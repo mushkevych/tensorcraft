@@ -1,7 +1,10 @@
+from os import path
+
 import onnxruntime as ort
 import torch
 import torch.onnx
 
+from fs_utils import get_module_location
 from imgproj.classifier.img_classifier import ImgClassifier
 from imgproj.classifier.img_configuration import ModelConf
 
@@ -11,11 +14,14 @@ TMPL_SYS_METRICS_FILE_NAME = 'system_metrics.{0}.{1}px.json'
 TMPL_WEIGHTS_FILE_NAME = '{0}.{1}px.weights'
 
 COMPUTE_DEVICE_CPU = torch.device('cpu')
+cwd = get_module_location()
+
 
 def export_to_onnx(outlier_class: type[ImgClassifier]):
     model_conf = ModelConf()
     model = outlier_class(model_conf)
-    model.load_model_weights(TMPL_WEIGHTS_FILE_NAME.format(outlier_class.__name__, model_conf.image_size[0]))
+    weights_file_name = TMPL_WEIGHTS_FILE_NAME.format(outlier_class.__name__, model_conf.image_size[0])
+    model.load_model_weights(path.join(cwd, weights_file_name))
 
     # size=(1, 1, model_conf.image_size, model_conf.image_size) stands for (1 batch, 1 color channel, image_height, image_width)
     # * 255 stands for EfficientNet models expect their inputs to be float tensors of pixels with values in the [0-255] range
@@ -25,10 +31,11 @@ def export_to_onnx(outlier_class: type[ImgClassifier]):
         'logits': {0: 'batch_size'}       # Dynamic batch dimension for output
     }
 
+    onnx_file_name = TMPL_ONNX_FILE_NAME.format(outlier_class.__name__, model_conf.image_size[0])
     torch.onnx.export(
         model,
         dummy_input,
-        f=TMPL_ONNX_FILE_NAME.format(outlier_class.__name__, model_conf.image_size[0]),
+        f=path.join(cwd, onnx_file_name),
         export_params=True,
         input_names=['img_grey'],
         output_names=['logits'],
@@ -37,7 +44,8 @@ def export_to_onnx(outlier_class: type[ImgClassifier]):
 
 
 def print_details(outlier_class: type[ImgClassifier]):
-    session = ort.InferenceSession(TMPL_ONNX_FILE_NAME.format(outlier_class.__name__, ModelConf.image_size[0]))
+    onnx_file_name = TMPL_ONNX_FILE_NAME.format(outlier_class.__name__, ModelConf.image_size[0])
+    session = ort.InferenceSession(path.join(cwd, onnx_file_name))
     print('-' * 10)
     print(f'Model classname: {outlier_class.__name__}')
 

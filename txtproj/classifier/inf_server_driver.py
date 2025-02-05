@@ -9,7 +9,7 @@ class InferenceServerDriver:
     def __init__(self):
         self.session = TxtSession()
 
-    def predict(self, inputs: pd.DataFrame, params=None) -> pd.DataFrame:
+    def predict(self, inputs: pd.DataFrame) -> pd.DataFrame:
         inputs['text_body'] = inputs['text_body_b64'].apply(
             lambda x: base64.b64decode(x).decode('utf-8')
         )
