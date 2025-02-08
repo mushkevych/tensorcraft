@@ -5,12 +5,8 @@ import onnxruntime as ort
 import pandas as pd
 
 from imgproj.classifier.img_configuration import ModelConf
+from np_utils import sigmoid
 from utils.image_toolbox import resize_crop_and_pad, resize_and_pad
-
-
-def sigmoid(x: np.ndarray) -> np.ndarray:
-    """Compute the Sigmoid function for the input array."""
-    return 1 / (1 + np.exp(-x))
 
 
 class ImgProjSession:

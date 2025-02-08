@@ -7,13 +7,13 @@ import pandas as pd
 from tqdm import tqdm
 from tqdm.auto import tqdm
 
-from utils.image_toolbox import resize_crop_and_pad, resize_and_pad
 from imgproj.classifier.img_configuration import ModelConf
+from utils.image_toolbox import resize_crop_and_pad, resize_and_pad
 
 
 class ImgFolderLoader:
     def __init__(self):
-        self.model_conf = ModelConf()  # Assuming ModelConf is defined elsewhere
+        self.model_conf = ModelConf()
         self.label: list[int] = list()
         self.file_name: list[str] = list()
         self.fqfn: list[str] = list()
@@ -26,12 +26,12 @@ class ImgFolderLoader:
             'file_name': self.file_name,
             'fqfn': self.fqfn,
             'img_grey': self.image_greyscale,
-            'img_height': [dim[0] for dim in self.image_dim] ,
-            'img_width': [dim[1] for dim in self.image_dim] ,
+            'img_height': [dim[0] for dim in self.image_dim],
+            'img_width': [dim[1] for dim in self.image_dim],
             'label': self.label
         })
 
-    def _process_image(self, args: tuple[str, str, int]) -> tuple[str, str, np.ndarray|None, int, int, int]:
+    def _process_image(self, args: tuple[str, str, int]) -> tuple[str, str, np.ndarray | None, int, int, int]:
         """Helper function to process each image (grayscale conversion and resizing)"""
         folder_path, file_name, label = args
         fqfn = os.path.join(folder_path, file_name)
@@ -63,7 +63,7 @@ class ImgFolderLoader:
         num_workers = min(cpu_count(), len(tasks))
         with Pool(processes=num_workers) as pool:
             for file_name, fqfn, scaled_image_grey, img_height, img_width, label in tqdm(
-                    pool.imap_unordered(self._process_image, tasks), total=len(tasks), desc='Image processing'
+                pool.imap_unordered(self._process_image, tasks), total=len(tasks), desc='Image processing'
             ):
                 if scaled_image_grey is not None:
                     self.file_name.append(file_name)

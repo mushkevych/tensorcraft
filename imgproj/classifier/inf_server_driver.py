@@ -29,13 +29,7 @@ class InferenceServerDriver:
         # Decode JPEG images from base64 strings
         inputs['img_grey'] = inputs['jpeg_file_b64'].apply(decode_jpeg)
 
-        # Log the shape of the first element
-        if not inputs['img_grey'].empty:
-            logger.info(f'img_grey[0].shape={inputs["img_grey"].iloc[0].shape}')
-        else:
-            logger.info('img_grey is empty.')
-
-        labels = self.session.run(inputs)
+        labels: np.ndarray = self.session.run(inputs)
         for label in labels:
             logger.info(f'Label={label.item()}')
         return pd.DataFrame(labels, columns=('labels',))

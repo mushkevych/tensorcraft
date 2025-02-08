@@ -1,7 +1,10 @@
+from os import path
+
 import onnxmltools
 import onnxruntime as ort
 from skl2onnx.common.data_types import FloatTensorType
 
+from fs_utils import get_module_location
 from txtproj.classifier.txt_classifier import LrTxtClassifier, SvmTxtClassifier, LgbmTxtClassifier
 from txtproj.classifier.txt_configuration import ModelConf
 
@@ -10,11 +13,13 @@ TMPL_EVAL_METRICS_FILE_NAME = 'evaluation_metrics.{0}.json'
 TMPL_SYS_METRICS_FILE_NAME = 'system_metrics.{0}.json'
 TMPL_WEIGHTS_FILE_NAME = '{0}.weights'
 
+cwd = get_module_location()
+
 
 def export_to_onnx(outlier_class: type[LrTxtClassifier | SvmTxtClassifier]):  # LgbmTextClassifier
     model_conf = ModelConf()
     model = outlier_class(model_conf)
-    model.load_model_weights(TMPL_WEIGHTS_FILE_NAME.format(outlier_class.__name__))
+    model.load_model_weights(path.join(cwd, TMPL_WEIGHTS_FILE_NAME.format(outlier_class.__name__)))
 
     initial_type: list = [('text_tfidf', FloatTensorType([None, model_conf.input_size]))]
     onnx_model = onnxmltools.convert_sklearn(model._model, initial_types=initial_type)

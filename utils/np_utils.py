@@ -16,3 +16,8 @@ class NpEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return super(NpEncoder, self).default(obj)
+
+
+def sigmoid(x: np.ndarray) -> np.ndarray:
+    """Compute the Sigmoid function for the input array."""
+    return 1 / (1 + np.exp(-x))

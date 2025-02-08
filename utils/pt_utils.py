@@ -1,10 +1,12 @@
 import gc
 from typing import Any
 
+import numpy as np
 import torch
 from torch import nn, device
 # pip install tensorboard
 from torch.utils.tensorboard import SummaryWriter
+from torch.utils.data import Dataset
 
 
 # pylint: disable = abstract-method
@@ -62,3 +64,22 @@ def load_model_weights(model: nn.Module, file_path: str) -> nn.Module:
     model.load_state_dict(torch.load(file_path, weights_only=True, map_location=device('cpu')))
     model.eval()
     return model
+
+
+class NumpyDataset(Dataset):
+    def __init__(self, X: np.ndarray, y: np.ndarray):
+        self.X = torch.tensor(X, dtype=torch.float32)
+        self.y = torch.tensor(y, dtype=torch.float32)
+        # Ensure y has an extra dimension for concatenation
+        if len(self.y.shape) == 1:
+            self.y = self.y.unsqueeze(1)  # Convert (N,) -> (N,1)
+
+    def __len__(self) -> int:
+        return len(self.X)
+
+    def __getitem__(self, idx: int) -> torch.Tensor:
+        """
+        Returns a concatenated tensor of X[idx] and y[idx]
+        Ensures correct dimensions for concatenation.
+        """
+        return torch.cat([self.X[idx], self.y[idx]], dim=0)  # Ensure y is (1,) so concat works
