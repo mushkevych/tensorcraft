@@ -1,8 +1,8 @@
 {
   "input_size": 38,
-  "avg_inference_sec": 0.000181042,
+  "avg_inference_sec": 0.000182524,
   "dataset.split_ratio": 0.2,
   "tree_count": 100,
   "dataset_size.class_0": 350,
-  "dataset_size.class_1": 349
+  "dataset_size.class_1": 354
 }
