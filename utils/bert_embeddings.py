@@ -6,8 +6,7 @@ import torch
 from langchain import text_splitter
 from langchain_text_splitters import Language
 
-from lm_components import LmComponents
-from utils.lm_components import GraphCodeBertConf
+from utils.lm_components import LmComponents, GraphCodeBertConf
 from utils.system_logger import logger
 
 

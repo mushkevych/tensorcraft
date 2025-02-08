@@ -7,7 +7,7 @@ from numpy import ndarray
 from tqdm import tqdm
 from tqdm.auto import tqdm
 
-from trainer.lm_core import instantiate_ft
+from utils.lm_core import instantiate_ft
 from xplainproj.classifier.textcode_features import script_attributes_log_scale, ratio_of_comments_to_code, \
     is_64base_content_present, compute_ft_embeddings
 from xplainproj.classifier.xplain_configuration import ModelConf

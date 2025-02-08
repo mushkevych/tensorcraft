@@ -7,14 +7,12 @@ from torch import nn
 from mlpbertproj.classifier.mlpbert_classifier import MlpBertModel
 from mlpbertproj.classifier.mlpbert_configuration import ModelConf
 from mlpbertproj.classifier.onnx_exporter import WEIGHTS_FILE_NAME
-from lm_components import LmComponents
-from utils.lm_components import DSMODELS_PREFIX, FQFP_MODEL_BERT_BASE, FQFP_MODEL_BERT_BASE_XLA, GraphCodeBertConf
-
+from utils.lm_components import LmComponents, DSMODELS_PREFIX, FQFP_MODEL_BERT_BASE, FQFP_MODEL_BERT_BASE_XLA, \
+    GraphCodeBertConf
 
 # XLA stands for Accelerated Linear Algebra
 FQFP_WEIGHTS_SEC_CPU = path.join(DSMODELS_PREFIX, 'tensorcraft', 'mlpbert_classifier', WEIGHTS_FILE_NAME)
 FQFP_MODEL_SEC_XLA = path.join(DSMODELS_PREFIX, 'tensorcraft', 'mlpbert_classifier', f'{MlpBertModel.__name__}.xlapt')
-
 
 model_conf = ModelConf()
 

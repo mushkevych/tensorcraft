@@ -1,4 +1,3 @@
-import base64
 import os
 from multiprocessing import Pool, cpu_count
 
@@ -9,7 +8,7 @@ from tqdm import tqdm
 from tqdm.auto import tqdm
 
 from mlpbertproj.classifier.mlpbert_configuration import ModelConf
-from trainer.lm_core import instantiate_ml_components
+from utils.lm_core import instantiate_ml_components
 from utils.bert_embeddings import compute_bert_embeddings
 
 

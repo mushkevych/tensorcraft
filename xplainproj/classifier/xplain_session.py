@@ -3,7 +3,7 @@ import os
 import numpy as np
 import onnxruntime as ort
 
-from trainer.lm_core import instantiate_ft
+from utils.lm_core import instantiate_ft
 from xplainproj.classifier.textcode_features import compute_ft_embeddings, script_attributes_log_scale, \
     ratio_of_comments_to_code, is_64base_content_present
 

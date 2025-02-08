@@ -12,8 +12,8 @@ from torch.utils.data import DataLoader, Dataset
 
 from mlpbertproj.classifier.mlpbert_classifier import MlpBertModel
 from mlpbertproj.classifier.mlpbert_configuration import ModelConf, OptimizerConf, LrComputerConf, TrainerConf
-from trainer.mlpbert_dataset import MlpBertDataset
-from trainer.lr_computer_with_decay import LRComputerWithDecay
+from mlpbertproj.trainer.mlpbert_dataset import MlpBertDataset
+from utils.lr_computer_with_decay import LRComputerWithDecay
 
 
 def initialize_modules() -> tuple[MlpBertModel, optim.AdamW, _Loss, LRComputerWithDecay]:

@@ -13,8 +13,8 @@ from tqdm.auto import tqdm
 
 from imgproj.classifier.img_classifier import ImgClassifier
 from imgproj.classifier.img_configuration import ModelConf, OptimizerConf, LrComputerConf, TrainerConf
-from trainer.img_dataset import ImgDataset
-from trainer.lr_computer_with_decay import LRComputerWithDecay
+from imgproj.trainer.img_dataset import ImgDataset
+from utils.lr_computer_with_decay import LRComputerWithDecay
 from utils.compute_device import resolve_device_mapping
 from utils.system_logger import logger
 

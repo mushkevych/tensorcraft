@@ -1,14 +1,13 @@
 import json
 from typing import Tuple
 
-import numpy as np
 import pandas as pd
 from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score, accuracy_score
 from sklearn.model_selection import train_test_split
 
 from xplainproj.classifier.xplain_configuration import ModelConf, TrainerConf
 from xplainproj.classifier.xplain_classifier import XplainClassifier
-from trainer.xplain_dataset_np import XplainNpDataset
+from xplainproj.trainer.xplain_dataset_np import XplainNpDataset
 
 
 class Trainer:
