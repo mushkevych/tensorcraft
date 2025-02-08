@@ -4,7 +4,7 @@ import numpy as np
 from mlpbertproj.classifier.mlpbert_configuration import ModelConf
 from mlpbertproj.classifier.neuronx_pt_exporter import FQFP_MODEL_SEC_XLA
 from utils.bert_embeddings import compute_bert_embeddings
-from lm_components import LmComponents
+from utils.lm_components import LmComponents
 from utils.system_logger import logger
 
 

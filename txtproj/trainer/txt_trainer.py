@@ -7,7 +7,7 @@ from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_sco
     precision_recall_curve, auc
 from sklearn.model_selection import train_test_split
 
-from trainer.txt_dataset import TxtDataset
+from txtproj.trainer.txt_dataset import TxtDataset
 from txtproj.classifier.txt_classifier import LrTxtClassifier, SvmTxtClassifier, LgbmTxtClassifier
 from txtproj.classifier.txt_configuration import TrainerConf, ModelConf
 

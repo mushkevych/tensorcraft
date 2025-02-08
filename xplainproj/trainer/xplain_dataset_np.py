@@ -45,7 +45,7 @@ class XplainNpDataset:
                     features.append(np.array([row[name]], dtype=np.float32))
             return np.concatenate(features, axis=0)
 
-        features = np.stack([row_features(row) for _, row in self.df.iterrows()])
-        labels = self.df['label'].values.astype(np.float32)
+        np_features = np.stack([row_features(row) for _, row in self.df.iterrows()])
+        np_labels = self.df['label'].values.astype(np.float32)
 
-        return features, labels
+        return np_features, np_labels

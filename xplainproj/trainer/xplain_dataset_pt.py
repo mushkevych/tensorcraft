@@ -23,7 +23,7 @@ class XplainPtDataset(torch.utils.data.Dataset):
             else:
                 features.append(torch.tensor(row[name], dtype=torch.float32).unsqueeze(0))
 
-        # Get the label as a float32 scalar
-        label = torch.tensor(row['label'], dtype=torch.float32).unsqueeze(0)
-        return *features, label
+        # Get the label as a float32 Tensor
+        pt_label = torch.tensor(row['label'], dtype=torch.float32).unsqueeze(0)
+        return *features, pt_label
 

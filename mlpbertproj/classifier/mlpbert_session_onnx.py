@@ -6,9 +6,9 @@ import torch
 
 from mlpbertproj.classifier.mlpbert_configuration import ModelConf
 from utils.bert_embeddings import compute_bert_embeddings
+from utils.lm_core import instantiate_ml_components, MODEL_BERT_BASE
+from utils.np_utils import sigmoid
 from utils.system_logger import logger
-from np_utils import sigmoid
-from trainer.lm_core import instantiate_ml_components, MODEL_BERT_BASE
 
 
 class OnnxSession:
