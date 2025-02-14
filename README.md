@@ -22,6 +22,10 @@ Tensor Craft is a collection of utilities and how-to for a typical AI/ML project
   * [xplain_shap_values.ipynb](xplainproj/xplain_shap_values.ipynb) provides an illustration on how to use Shapley Permutation and Kernel Shapley
   * [xplain_smoke_tester.ipynb](xplainproj/xplain_smoke_tester.ipynb) provides a notebook to run a smoke test
 
+`The LoraProj` stands for a LoRA fine-tuning of the BERT model:
+  * [lora_dataset_prep.ipynb](loraproj/lora_dataset_prep.ipynb) prepares the dataset
+  * [lora_classifier.ipynb](loraproj/lora_classifier.ipynb) fine-tune the model
+
 Tensorboard instructions
 ```bash
 source ~/virtualenvs/tensor_craft/bin/activate
