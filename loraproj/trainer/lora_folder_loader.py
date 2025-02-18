@@ -49,7 +49,7 @@ class LoraFolderLoader:
         return file_name, fqfn, body, input_ids, attention_mask, token_type_ids, label
 
     def read(self, folder_path: str, labels: list[str] = ['0', '1']) -> None:
-        """Read test files from the given folder path and process them in parallel."""
+        """Read text files from the given folder path and process them in parallel."""
         tasks: list[tuple[str, str, int]] = list()
 
         # Prepare the task list for multiprocessing

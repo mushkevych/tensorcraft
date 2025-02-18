@@ -1,14 +1,20 @@
+from os import path
+
 import numpy as np
 import pandas as pd
 from sklearn.metrics import f1_score, precision_score, recall_score, roc_auc_score, accuracy_score
 from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
-from transformers import Trainer, DataCollatorWithPadding, EvalPrediction
-from transformers import TrainingArguments
+from transformers import Trainer, DataCollatorWithPadding, EvalPrediction, TrainingArguments
 
-from loraproj.classifier.lora_classifier import instantiate_lora_model, instantiate_tokenizer, LORA_PATH
-from loraproj.classifier.lora_configuration import TrainerConf
-from loraproj.trainer.lora_dataset import LoraDataset
+from llmadapterproj.classifier.llmadapter_classifier import (
+    instantiate_llmadapter_model,
+    instantiate_tokenizer,
+    ADAPTER_NAME,
+    ADAPTER_PATH
+)
+from llmadapterproj.classifier.llmadapter_configuration import TrainerConf
+from llmadapterproj.trainer.llmadapter_dataset import LlmAdapterDataset
 from utils.compute_device import PREFERRED_DEVICE
 
 
@@ -32,17 +38,17 @@ def compute_metrics(eval_pred: EvalPrediction, *args, **kwargs) -> dict[str, flo
     return metrics
 
 
-class LoraTrainer:
+class LlmAdapterTrainer:
     def __init__(self, df: pd.DataFrame, trainer_conf: TrainerConf):
         self.df = df
         self.trainer_conf = trainer_conf
-        self.model = instantiate_lora_model(device_name=PREFERRED_DEVICE)
+        self.model = instantiate_llmadapter_model(device_name=PREFERRED_DEVICE)
         self.tokenizer = instantiate_tokenizer()
 
         self.train_dataset, self.test_dataset = self.prepare_dataset()
 
         training_args = TrainingArguments(
-            output_dir=LORA_PATH,
+            output_dir=ADAPTER_PATH,
             per_device_train_batch_size=TrainerConf.batch_size,
             per_device_eval_batch_size=TrainerConf.batch_size,
             learning_rate=2e-4,
@@ -52,7 +58,7 @@ class LoraTrainer:
             save_total_limit=2,
             load_best_model_at_end=True,
             metric_for_best_model='accuracy',
-            label_names=['labels'],  # must match the LoraDataset.label feature name
+            label_names=['labels'],  # must match the LoraDataset.label column name
             push_to_hub=False,
         )
 
@@ -67,24 +73,32 @@ class LoraTrainer:
         )
 
     def prepare_dataset(self) -> tuple[Dataset, Dataset]:
-        # Splitting the data
+        # Split the data
         train_df, test_df = train_test_split(
             self.df,
             test_size=self.trainer_conf.dataset_split_ratio,
-            random_state=self.trainer_conf.dataset_random_state
+            random_state=self.trainer_conf.dataset_random_state,
         )
 
-        train_dataset: Dataset = LoraDataset(train_df)
-        test_dataset: Dataset = LoraDataset(test_df)
+        train_dataset: Dataset = LlmAdapterDataset(train_df)
+        test_dataset: Dataset = LlmAdapterDataset(test_df)
         return train_dataset, test_dataset
 
     def train(self) -> None:
         self.trainer.train()
 
-    def save_and_merge(self):
-        # Merge LoRA with base model for inference
-        merged_model = self.model.merge_and_unload()
+    def save(self) -> None:
+        """
+        Save the trained model (including its adapter weights) and the tokenizer to ADAPTER_PATH.
+        """
+        # Option 1: Save the *entire* model (base + adapter) with Hugging Face's standard API:
+        # self.trainer.save_model(output_dir=ADAPTER_PATH)
+        # This calls self.model.save_pretrained(ADAPTER_PATH) under the hood.
+        # The adapter weights and classification head are included.
 
-        # Save model
-        merged_model.save_pretrained(LORA_PATH)
-        self.tokenizer.save_pretrained(LORA_PATH)
+        # Option 2: Save only the trained adapter checkpoint
+        adapter_subfolder = path.join(ADAPTER_PATH, ADAPTER_NAME)
+        self.model.save_adapter(adapter_subfolder, adapter_name=ADAPTER_NAME, with_head=True)
+
+        # Save tokenizer
+        self.tokenizer.save_pretrained(ADAPTER_PATH)

@@ -24,7 +24,16 @@ Tensor Craft is a collection of utilities and how-to for a typical AI/ML project
 
 `The LoraProj` stands for a LoRA fine-tuning of the BERT model:
   * [lora_dataset_prep.ipynb](loraproj/lora_dataset_prep.ipynb) prepares the dataset
-  * [lora_classifier.ipynb](loraproj/lora_classifier.ipynb) fine-tune the model
+  * [lora_classifier.ipynb](loraproj/lora_classifier.ipynb) fine-tunes the model
+
+`The LlmAdapterProj` stands for an Adapter-based fine-tuning of the BERT model:
+  * [llmadapter_dataset_prep.ipynb](llmadapterproj/llmadapter_dataset_prep.ipynb) prepares the dataset
+  * [llmadapter_classifier.ipynb](llmadapterproj/llmadapter_classifier.ipynb) fine-tunes the model
+
+`Handbooks` represent common operations for Numpy/Pandas:
+  * [numpy_handbook.ipynb](handbooks/numpy_handbook.ipynb)
+  * [pandas_handbook.ipynb](handbooks/pandas_handbook.ipynb)
+
 
 Tensorboard instructions
 ```bash
