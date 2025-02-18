@@ -1,25 +1,25 @@
 import os
 from multiprocessing import Pool, cpu_count
 
-import numpy as np
 import pandas as pd
-import torch
 from tqdm import tqdm
 from tqdm.auto import tqdm
+from transformers.tokenization_utils_base import BatchEncoding
 
-from mlpbertproj.classifier.mlpbert_configuration import ModelConf
-from utils.lm_core import instantiate_ml_components
-from utils.bert_embeddings import compute_bert_embeddings
+from llmadapterproj.classifier.llmadapter_classifier import instantiate_tokenizer
+from llmadapterproj.classifier.llmadapter_configuration import ModelConf
 
 
-class MlpBertFolderLoader:
+class LlmAdapterFolderLoader:
     def __init__(self):
         self.model_conf = ModelConf()
         self.label: list[int] = list()
         self.file_name: list[str] = list()
         self.fqfn: list[str] = list()
         self.text_body: list[str] = list()
-        self.text_embeddings: list[np.ndarray] = list()
+        self.input_ids: list[int] = list()
+        self.attention_mask: list[int] = list()
+        self.token_type_ids: list[int] = list()
 
     @property
     def df(self) -> pd.DataFrame:
@@ -27,22 +27,26 @@ class MlpBertFolderLoader:
             'file_name': self.file_name,
             'fqfn': self.fqfn,
             'text_body': self.text_body,
-            'text_embeddings': self.text_embeddings,
+            'input_ids': self.input_ids,
+            'attention_mask': self.attention_mask,
+            'token_type_ids': self.token_type_ids,
             'label': self.label
         })
 
-    def _process_text_file(self, args: tuple[str, str, int]) -> tuple[str, str, str, np.ndarray | None, int]:
+    def _process_text_file(self, args: tuple[str, str, int]) -> tuple[str, str, str, list[int], list[int], list[int], int]:
         """Helper function to process text file (embeddings computation)"""
         folder_path, file_name, label = args
         fqfn = os.path.join(folder_path, file_name)
 
-        ml_components = instantiate_ml_components()
+        tokenizer = instantiate_tokenizer()
         with open(fqfn) as f:
             body = f.read()
-            pt_embeddings: torch.Tensor = compute_bert_embeddings(ml_components, body, remove_batch_dim=True)
+            tokenized_output: BatchEncoding = tokenizer(body, truncation=True, padding='max_length', max_length=512)
+            input_ids: list[int] = tokenized_output['input_ids']
+            attention_mask: list[int] = tokenized_output['attention_mask']
+            token_type_ids: list[int] = tokenized_output.get('token_type_ids')
 
-        np_embeddings = pt_embeddings.cpu().numpy()
-        return file_name, fqfn, body, np_embeddings, label
+        return file_name, fqfn, body, input_ids, attention_mask, token_type_ids, label
 
     def read(self, folder_path: str, labels: list[str] = ['0', '1']) -> None:
         """Read text files from the given folder path and process them in parallel."""
@@ -52,7 +56,8 @@ class MlpBertFolderLoader:
         for label in tqdm(labels, desc='Creating tasks', leave=True):
             label_folder = os.path.join(folder_path, label)
             if not os.path.isdir(label_folder):
-                continue  # Skip if the folder does not exist
+                # Skip if the folder does not exist
+                continue
 
             for file_name in os.listdir(label_folder):
                 if file_name.endswith('.ps1'):
@@ -61,13 +66,13 @@ class MlpBertFolderLoader:
         # Use multiprocessing to process images in parallel
         num_workers = min(cpu_count(), len(tasks))
         with Pool(processes=num_workers) as pool:
-            for file_name, fqfn, body, embeddings, label in tqdm(
+            for file_name, fqfn, body, input_ids, attention_mask, token_type_ids, label in tqdm(
                 pool.imap_unordered(self._process_text_file, tasks), total=len(tasks), desc='Text files processing'
             ):
-                if embeddings is not None:
-                    self.file_name.append(file_name)
-                    self.fqfn.append(fqfn)
-
-                    self.text_body.append(body)
-                    self.text_embeddings.append(embeddings)
-                    self.label.append(label)
+                self.file_name.append(file_name)
+                self.fqfn.append(fqfn)
+                self.text_body.append(body)
+                self.input_ids.append(input_ids)
+                self.attention_mask.append(attention_mask)
+                self.token_type_ids.append(token_type_ids)
+                self.label.append(label)

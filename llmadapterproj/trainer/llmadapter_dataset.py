@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import Dataset
 
 
-class LoraDataset(Dataset):
+class LlmAdapterDataset(Dataset):
     def __init__(self, df: pd.DataFrame):
         self.data = df.to_dict('records')  # Convert DataFrame to list of dictionaries
 
@@ -27,7 +27,7 @@ class LoraDataset(Dataset):
         inputs = {
             'input_ids': pt_input_ids,
             'attention_mask': pt_attention_mask,
-            'labels': pt_label,  # must match LoraTrainer.TrainingArguments.label_names
+            'labels': pt_label,  # must match LlmAdapterTrainer.TrainingArguments.label_names
         }
 
         # Only include token_type_ids if available (some models don’t use it)

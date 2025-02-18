@@ -1,8 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-import torch
-
 
 @dataclass(kw_only=True)
 class ModelConf:
@@ -20,7 +18,7 @@ class ModelConf:
 @dataclass(kw_only=True)
 class TrainerConf:
     batch_size: int = 8
-    epochs: int = 12
+    epochs: int = 7
     dataset_split_ratio: float = 0.2
     dataset_random_state: int | None = 42
 

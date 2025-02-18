@@ -76,7 +76,7 @@ class XplainFolderLoader:
         )
 
     def read(self, folder_path: str, labels: list[str] = ['0', '1']) -> None:
-        """Read test files from the given folder path and process them in parallel."""
+        """Read text files from the given folder path and process them in parallel."""
         tasks: list[tuple[str, str, int]] = list()
 
         # Prepare the task list for multiprocessing
