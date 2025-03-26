@@ -48,7 +48,7 @@ class LoraFolderLoader:
 
         return file_name, fqfn, body, input_ids, attention_mask, token_type_ids, label
 
-    def read(self, folder_path: str, labels: list[str] = ['0', '1']) -> None:
+    def read(self, folder_path: str, labels: list[str] = ['0', '1'], extensions: tuple[str, ...] = ('.ps1', )) -> None:
         """Read text files from the given folder path and process them in parallel."""
         tasks: list[tuple[str, str, int]] = list()
 
@@ -60,7 +60,7 @@ class LoraFolderLoader:
                 continue
 
             for file_name in os.listdir(label_folder):
-                if file_name.endswith('.ps1'):
+                if file_name.endswith(extensions):
                     tasks.append((label_folder, file_name, int(label)))
 
         # Use multiprocessing to process images in parallel

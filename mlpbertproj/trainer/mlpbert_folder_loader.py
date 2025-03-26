@@ -44,7 +44,7 @@ class MlpBertFolderLoader:
         np_embeddings = pt_embeddings.cpu().numpy()
         return file_name, fqfn, body, np_embeddings, label
 
-    def read(self, folder_path: str, labels: list[str] = ['0', '1']) -> None:
+    def read(self, folder_path: str, labels: list[str] = ['0', '1'], extensions: tuple[str, ...] = ('.ps1', )) -> None:
         """Read text files from the given folder path and process them in parallel."""
         tasks: list[tuple[str, str, int]] = list()
 
@@ -55,7 +55,7 @@ class MlpBertFolderLoader:
                 continue  # Skip if the folder does not exist
 
             for file_name in os.listdir(label_folder):
-                if file_name.endswith('.ps1'):
+                if file_name.endswith(extensions):
                     tasks.append((label_folder, file_name, int(label)))
 
         # Use multiprocessing to process images in parallel

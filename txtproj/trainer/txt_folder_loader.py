@@ -33,7 +33,9 @@ class TextFolderLoader:
             'label': self.label
         })
 
-    def read(self, folder_path: str, labels: list[str] = ['0', '1'], positive_labels: list[str] = ['1']) -> None:
+    def read(
+        self, folder_path: str, labels: list[str] = ['0', '1'], positive_labels: list[str] = ['1'], extensions: tuple[str, ...] = ('.txt', )
+    ) -> None:
         """Read Textual files from the given folder path and builds the vocabulary."""
         for label in labels:
             label_folder = os.path.join(folder_path, label)
@@ -42,7 +44,7 @@ class TextFolderLoader:
                 continue
 
             for filename in os.listdir(label_folder):
-                if filename.endswith('.txt'):
+                if filename.endswith(extensions):
                     self.file_names.append(filename)
                     file_path = os.path.join(label_folder, filename)
                     with open(file_path, 'r', encoding='utf-8') as file:

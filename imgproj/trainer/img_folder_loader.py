@@ -45,7 +45,7 @@ class ImgFolderLoader:
             img_height, img_width = scaled_image_grey.shape[:2]
         return file_name, fqfn, scaled_image_grey, img_height, img_width, label
 
-    def read(self, folder_path: str, labels: list[str] = ['0', '1']) -> None:
+    def read(self, folder_path: str, labels: list[str] = ['0', '1'], extensions: tuple[str, ...] = ('.jpg', '.jpeg')) -> None:
         """Read image files from the given folder path and process them in parallel."""
         tasks: list[tuple[str, str, int]] = list()
 
@@ -56,7 +56,7 @@ class ImgFolderLoader:
                 continue  # Skip if the folder does not exist
 
             for file_name in os.listdir(label_folder):
-                if file_name.endswith('.jpg') or file_name.endswith('.jpeg'):
+                if file_name.endswith(extensions):
                     tasks.append((label_folder, file_name, int(label)))
 
         # Use multiprocessing to process images in parallel
