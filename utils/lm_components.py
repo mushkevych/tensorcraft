@@ -3,7 +3,7 @@ from os import path
 
 import fasttext
 import torch
-from transformers import AutoConfig, AutoModel, AutoTokenizer
+from transformers import AutoConfig, AutoModel, AutoTokenizer, PretrainedConfig, PreTrainedTokenizer
 
 from system_logger import logger
 from utils.compute_device import resolve_device_mapping
@@ -34,9 +34,9 @@ class LmComponents:
         self.device_name, self.compute_device, self.tensor_device = resolve_device_mapping(device_name)
 
         self.model_name = model_name
-        self.config = None
-        self.llm = None
-        self.tokenizer = None
+        self.config: Optional[PretrainedConfig] = None
+        self.llm: Optional[nn.Module] = None
+        self.tokenizer: Optional[PreTrainedTokenizer] = None
 
     def load(self, hf_token: str = None, output_hidden_states: bool = True) -> None:
         """
