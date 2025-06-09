@@ -121,3 +121,26 @@ def compute_bert_embeddings(ml_components: LmComponents, text_body: str, remove_
                         for chunk in text_body_chunks]
     aggregated_embedding = _aggregate_embeddings(ml_components, chunk_embeddings)
     return aggregated_embedding
+
+
+def encode_text_to_inputs(ml_components: LmComponents, text: str) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Tokenize `text` into (input_ids, attention_mask), each of shape (1, seq_len).
+    NOTE: the leading batch dimension remains.
+    """
+    # padding=True: Pads sequences to the length of the longest sequence in the batch.
+    # padding='max_length': Pads sequences to the max_length specified, regardless of the actual input length.
+    padding_strategy = 'max_length' if ml_components.device_name == 'xla' else True
+
+    encoded = ml_components.tokenizer(
+        text=text,
+        padding=padding_strategy,
+        truncation=True,
+        max_length=GraphCodeBertConf.max_position_embeddings,
+        return_tensors='pt',
+        return_attention_mask=True,
+    )
+
+    # encoded['input_ids'] has shape (1, seq_len)
+    # encoded['attention_mask'] has shape (1, seq_len)
+    return encoded['input_ids'], encoded['attention_mask']
