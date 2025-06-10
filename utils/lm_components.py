@@ -1,16 +1,17 @@
 from dataclasses import dataclass
 from os import path
+from typing import Optional
 
 import fasttext
 import torch
+from torch import nn
 from transformers import AutoConfig, AutoModel, AutoTokenizer, PretrainedConfig, PreTrainedTokenizer
 
-from system_logger import logger
 from utils.compute_device import resolve_device_mapping
 from utils.fs_utils import get_module_location
 from utils.system_logger import logger
 
-DSMODELS_PREFIX = path.join(get_module_location(), '..', 'ext_models')
+DSMODELS_PREFIX = path.abspath(path.join(get_module_location(), '..', 'ext_models'))
 MODEL_BERT_BASE = 'microsoft/graphcodebert-base'
 MODEL_BERT_BASE_XLA = f'{MODEL_BERT_BASE}/graphcodebert.xlapt'
 FQFP_MODEL_BERT_BASE = path.join(DSMODELS_PREFIX, MODEL_BERT_BASE)

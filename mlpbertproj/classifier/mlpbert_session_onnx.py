@@ -12,10 +12,10 @@ from utils.system_logger import logger
 
 
 class OnnxSession:
-    def __init__(self, model_path, reuse_gpu_tensor=False):
+    def __init__(self, model_path: str = MODEL_BERT_BASE, reuse_gpu_tensor: bool = False):
         self.reuse_gpu_tensor = reuse_gpu_tensor
         logger.info(f'Reuse GPU Tensor: {self.reuse_gpu_tensor}')
-        self.ml_components = instantiate_ml_components(MODEL_BERT_BASE)
+        self.ml_components = instantiate_ml_components(model_path)
         self.ml_components.load(output_hidden_states=True)
         model_file = path.join(path.dirname(__file__), 'MlpBertModel.onnx')
         self.session = ort.InferenceSession(
