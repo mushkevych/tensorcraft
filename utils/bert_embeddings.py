@@ -1,4 +1,3 @@
-import gc
 from contextlib import nullcontext
 from typing import Any
 
@@ -6,6 +5,7 @@ import torch
 from langchain import text_splitter
 from langchain_text_splitters import Language
 
+from pt_utils import run_gc
 from utils.lm_components import LmComponents, GraphCodeBertConf
 from utils.system_logger import logger
 
@@ -20,23 +20,6 @@ def tensor_info(description: str, t: torch.Tensor) -> None:
     logger.info(
         f'{description} tensor=(dtype:{t.dtype}, shape:{tuple(t.shape)}, device:{t.device}, is_cuda:{t.is_cuda})'
     )
-
-
-def run_gc() -> None:
-    """ Run Python's Garbage Collector and (if CUDA is available) clean up GPU cache. """
-    try:
-        gc.collect()
-    except Exception as e:
-        logger.error(f'ERROR while gc.collect(): {e}')
-
-    try:
-        if torch.cuda.is_available():
-            logger.info(torch.cuda.memory_summary())
-            torch.cuda.empty_cache()
-            logger.info('Cleaned CUDA cache')
-            logger.info(torch.cuda.memory_summary())
-    except Exception as e:
-        logger.error(f'ERROR while trying to clean CUDA cache: {e}')
 
 
 def _chunk_text_with_overlap(text_body: str, max_length: int = 512, overlap: int = 50) -> list[str]:
@@ -121,3 +104,27 @@ def compute_bert_embeddings(ml_components: LmComponents, text_body: str, remove_
                         for chunk in text_body_chunks]
     aggregated_embedding = _aggregate_embeddings(ml_components, chunk_embeddings)
     return aggregated_embedding
+
+
+def encode_text_to_inputs(
+    ml_components: LmComponents, text: str, padding_strategy: str = 'max_length'
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Tokenize `text` into (input_ids, attention_mask), each of shape (1, seq_len).
+    NOTE: the leading batch dimension remains.
+        padding=True: Pads sequences to the length of the longest sequence in the batch.
+        padding='max_length': Pads sequences to the max_length specified, regardless of the actual input length.
+    """
+
+    encoded = ml_components.tokenizer(
+        text=text,
+        padding=padding_strategy,
+        truncation=True,
+        max_length=GraphCodeBertConf.max_position_embeddings,
+        return_tensors='pt',
+        return_attention_mask=True,
+    )
+
+    # encoded['input_ids'] has shape (1, seq_len)
+    # encoded['attention_mask'] has shape (1, seq_len)
+    return encoded['input_ids'], encoded['attention_mask']

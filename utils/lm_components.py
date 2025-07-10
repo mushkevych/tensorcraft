@@ -1,25 +1,26 @@
 from dataclasses import dataclass
-from os import path
+from os import path, makedirs
+from typing import Optional
 
 import fasttext
 import torch
-from transformers import AutoConfig, AutoModel, AutoTokenizer
+from torch import nn
+from transformers import AutoConfig, AutoModel, AutoTokenizer, PretrainedConfig, PreTrainedTokenizer
 
-from system_logger import logger
 from utils.compute_device import resolve_device_mapping
 from utils.fs_utils import get_module_location
 from utils.system_logger import logger
 
-DSMODELS_PREFIX = path.join(get_module_location(), '..', 'ext_models')
+DSMODELS_PREFIX = path.abspath(path.join(get_module_location(), '..', 'ext_models'))
 MODEL_BERT_BASE = 'microsoft/graphcodebert-base'
 MODEL_BERT_BASE_XLA = f'{MODEL_BERT_BASE}/graphcodebert.xlapt'
-FQFP_MODEL_BERT_BASE = path.join(DSMODELS_PREFIX, MODEL_BERT_BASE)
-FQFP_MODEL_BERT_BASE_XLA = path.join(DSMODELS_PREFIX, MODEL_BERT_BASE_XLA)
+FQFP_MODEL_BERT_BASE = path.abspath(path.join(DSMODELS_PREFIX, MODEL_BERT_BASE))
+FQFP_MODEL_BERT_BASE_XLA = path.abspath(path.join(DSMODELS_PREFIX, MODEL_BERT_BASE_XLA))
 
 FAST_TEXT_MODEL = 'facebookresearch/fastText'
 MODEL_FASTTEXT_D32 = 'cc.en.32.bin'
 MODEL_FASTTEXT_D300 = 'cc.en.300.bin'
-FQFP_MODEL_FASTTEXT_D32 = path.join(DSMODELS_PREFIX, FAST_TEXT_MODEL, MODEL_FASTTEXT_D32)
+FQFP_MODEL_FASTTEXT_D32 = path.abspath(path.join(DSMODELS_PREFIX, FAST_TEXT_MODEL, MODEL_FASTTEXT_D32))
 
 
 @dataclass(kw_only=True)
@@ -34,9 +35,9 @@ class LmComponents:
         self.device_name, self.compute_device, self.tensor_device = resolve_device_mapping(device_name)
 
         self.model_name = model_name
-        self.config = None
-        self.llm = None
-        self.tokenizer = None
+        self.config: Optional[PretrainedConfig] = None
+        self.llm: Optional[nn.Module] = None
+        self.tokenizer: Optional[PreTrainedTokenizer] = None
 
     def load(self, hf_token: str = None, output_hidden_states: bool = True) -> None:
         """
@@ -64,6 +65,13 @@ class LmComponents:
             self.model_name, config=self.config, token=hf_token, clean_up_tokenization_spaces=False
         )
         logger.info(f'LM Components successfully loaded for {self.device_name} compute architecture')
+
+    def save(self, fqfp_save_dir: str) -> None:
+        makedirs(fqfp_save_dir, exist_ok=True)
+
+        self.tokenizer.save_pretrained(fqfp_save_dir)
+        self.config.save_pretrained(fqfp_save_dir)
+        self.llm.save_pretrained(fqfp_save_dir)
 
 
 def load_ft_model(model_path: str) -> fasttext.FastText:
