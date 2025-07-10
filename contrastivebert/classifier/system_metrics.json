@@ -1,0 +1,8 @@
+{
+  "input_size": 512,
+  "avg_inference_sec": 0.037113457,
+  "parameter_count": 124645632,
+  "dataset.split_ratio": 0.2,
+  "dataset_size.class_train": 80,
+  "dataset_size.class_test": 20
+}

@@ -3,8 +3,11 @@ from os import path
 from utils.lm_components import MODEL_BERT_BASE, LmComponents, FQFP_MODEL_FASTTEXT_D32, load_ft_model, fasttext
 
 
-def load_hf_token() -> str:
+def load_hf_token() -> str | None:
     fqfp_token = path.abspath(path.join(path.dirname(__file__), '..', '.hugging_face.token'))
+    if not path.exists(fqfp_token):
+        return None
+
     with open(fqfp_token, 'r') as f:
         token = f.read().strip()
         # print(token)

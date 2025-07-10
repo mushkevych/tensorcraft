@@ -1,5 +1,5 @@
 import json
-from typing import Optional
+from typing import Optional, Any
 
 import numpy as np
 import pandas as pd
@@ -15,8 +15,11 @@ from tqdm.auto import tqdm
 from contrastivebert.classifier.contrastivebert_classifier import ContrastiveSBERT
 from contrastivebert.classifier.contrastivebert_configuration import ModelConf, OptimizerConf, LrComputerConf, TrainerConf
 from contrastivebert.trainer.contrastivebert_dataset import ContrastiveBertDataset
+from utils.pt_utils import run_gc
 from utils.lm_core import instantiate_ml_components
 from utils.lr_computer_with_decay import LRComputerWithDecay
+
+OOM_LIMIT: int = 8
 
 
 def initialize_modules() -> tuple[ContrastiveSBERT, optim.AdamW, _Loss, LRComputerWithDecay]:
@@ -32,14 +35,21 @@ def initialize_modules() -> tuple[ContrastiveSBERT, optim.AdamW, _Loss, LRComput
     return model, optimizer, criterion, lr_wd
 
 
+def identity_collate(batch: list[dict[str, Any]]):
+    # batch: list[dict[str, Any]]
+    # simply return the List without collating it, so that `batch` inside the loop is a list of examples
+    return batch
+
+
 class Trainer:
     def __init__(self, df: pd.DataFrame, trainer_conf: TrainerConf):
         self.df = df
         self.trainer_conf = trainer_conf
 
+        self.ml_components = instantiate_ml_components()
+
         self.train_dataset, self.test_dataset = self.prepare_dataset()
         self.model, self.optimizer, self.criterion, self.lr_wd = initialize_modules()
-        self.ml_components = instantiate_ml_components()
 
     def prepare_dataset(self) -> tuple[Dataset, Dataset]:
         # Splitting the data
@@ -54,10 +64,15 @@ class Trainer:
         return train_dataset, test_dataset
 
     def train(self) -> None:
-        train_loader = DataLoader(self.train_dataset, batch_size=self.trainer_conf.batch_size, shuffle=True)
+
+        train_loader = DataLoader(
+            self.train_dataset,
+            batch_size=self.trainer_conf.batch_size,
+            shuffle=True,
+            collate_fn=identity_collate,
+        )
 
         self.model.train()
-
         for epoch in tqdm(range(self.trainer_conf.epochs), desc='Training Epochs'):
             total_loss: float = 0.0
 
@@ -67,35 +82,65 @@ class Trainer:
                 param_group['lr'] = lr
 
             for batch in tqdm(train_loader, desc=f'Epoch {epoch + 1} Batches', leave=False):
-                # Move inputs to device
-                input_ids_left = batch['input_ids_left'].to(self.ml_components.tensor_device)
-                mask_left = batch['attention_mask_left'].to(self.ml_components.tensor_device)
-                input_ids_right = batch['input_ids_right'].to(self.ml_components.tensor_device)
-                mask_right = batch['attention_mask_right'].to(self.ml_components.tensor_device)
+                # Process all Flower Records in one pass
+                all_hfd_ids = torch.stack([ex['input_ids_hfd'] for ex in batch], dim=0)
+                all_hfd_mask = torch.stack([ex['attention_mask_hfd'] for ex in batch], dim=0)
+                all_hfd_ids = all_hfd_ids.to(self.ml_components.tensor_device)
+                all_hfd_mask = all_hfd_mask.to(self.ml_components.tensor_device)
+                emb_hfd = self.model(all_hfd_ids, all_hfd_mask)  # (N, H)
 
-                # Compute embeddings
-                emb_left = self.model(input_ids_left, mask_left)
-                emb_right = self.model(input_ids_right, mask_right)
+                # flower_name&flower_structure
+                # Flatten list[list[Tensor]] into list[Tensor] for all flowers across the batch
+                all_nas_ids: list[torch.Tensor] = []
+                all_nas_masks: list[torch.Tensor] = []
+                counts: list[int] = []
 
+                for ex in batch:
+                    nas_ids_list: list[torch.Tensor] = ex['input_ids_nas_list'][:OOM_LIMIT]
+                    nas_masks_list: list[torch.Tensor] = ex['attention_mask_nas_list'][:OOM_LIMIT]
+                    counts.append(len(nas_ids_list))
+                    all_nas_ids.extend(nas_ids_list)
+                    all_nas_masks.extend(nas_masks_list)
+
+                # Stack list[Tensor] vertically into two tensors of shape (total_flowers, seq_len)
+                stacked_nas_ids: torch.Tensor = torch.stack(all_nas_ids, dim=0).to(self.ml_components.tensor_device)
+                stacked_nas_masks: torch.Tensor = torch.stack(all_nas_masks, dim=0).to(self.ml_components.tensor_device)
+
+                # One forward pass for all flowers → (total_flowers, hidden_dim)
+                stacked_nas_embs: torch.Tensor = self.model(stacked_nas_ids, stacked_nas_masks)
+
+                # Split back by example and mean‐pool each chunk → List of (hidden_dim,)
+                agg_embs: list[torch.Tensor] = []
+                offset: int = 0
+                for c in counts:
+                    slice_emb: torch.Tensor = stacked_nas_embs[offset: offset + c]  # (c, hidden_dim)
+                    pooled_emb: torch.Tensor = slice_emb.mean(dim=0)  # (hidden_dim,)
+                    agg_embs.append(pooled_emb)
+                    offset += c
+
+                # Stack into final (batch_size, hidden_dim) tensor
+                emb_nas: torch.Tensor = torch.stack(agg_embs, dim=0)  # (batch, hidden_dim)
+
+                # contrastive loss
                 # Labels: +1 for positive pairs (since every row is matched)
-                target = torch.ones(emb_left.shape[0]).to(self.ml_components.tensor_device)
+                target = torch.ones(emb_nas.shape[0]).to(device=self.ml_components.tensor_device)
 
-                loss = self.criterion(emb_left, emb_right, target)
+                loss = self.criterion(emb_nas, emb_hfd, target)
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
 
                 total_loss += loss.item()
 
+                del all_hfd_ids, all_hfd_mask
+                del agg_embs, stacked_nas_ids, stacked_nas_masks, counts
+                run_gc()
+
+
             print(f'Epoch: {epoch + 1:>3}/{self.trainer_conf.epochs:>3}, '
                   f'LR:{lr:.5f}, Loss:{total_loss / len(train_loader):>4.5f}')
 
-    def evaluate(
-        self,
-        fqfn_metrics: Optional[str] = None,
-        with_negatives: bool = False,
-        negative_ratio: float = 1.0
-    ) -> dict[str, float]:
+    def evaluate(self, fqfn_metrics: Optional[str] = None) -> dict[str, float]:
         """
         Simplified evaluation for a Siamese/contrastive SBERT:
 
@@ -109,7 +154,12 @@ class Trainer:
           - 'avg_neg_cosine'     : float   (if with_negatives=True)
           - 'roc_auc'            : float   (if with_negatives=True)
         """
-        test_loader = DataLoader(self.test_dataset, batch_size=self.trainer_conf.batch_size, shuffle=False)
+        test_loader = DataLoader(
+            self.test_dataset,
+            batch_size=self.trainer_conf.batch_size,
+            shuffle=False,
+            collate_fn=identity_collate,
+        )
 
         self.model.to(self.ml_components.compute_device)
         self.model.eval()
@@ -122,62 +172,55 @@ class Trainer:
         with torch.no_grad():
             for batch in test_loader:
                 # Extract exactly as in train():
-                input_ids_left = batch['input_ids_left'].to(self.ml_components.tensor_device)
-                mask_left = batch['attention_mask_left'].to(self.ml_components.tensor_device)
-                input_ids_right = batch['input_ids_right'].to(self.ml_components.tensor_device)
-                mask_right = batch['attention_mask_right'].to(self.ml_components.tensor_device)
+                # Process all Flower Records in one pass
+                all_hfd_ids = torch.stack([ex['input_ids_hfd'] for ex in batch], dim=0)
+                all_hfd_mask = torch.stack([ex['attention_mask_hfd'] for ex in batch], dim=0)
+                all_hfd_ids = all_hfd_ids.to(self.ml_components.tensor_device)
+                all_hfd_mask = all_hfd_mask.to(self.ml_components.tensor_device)
+                emb_hfd = self.model(all_hfd_ids, all_hfd_mask)  # (N, H)
 
-                # Compute embeddings
-                emb_left = self.model(input_ids_left, mask_left)  # shape (B, H)
-                emb_right = self.model(input_ids_right, mask_right)  # shape (B, H)
+                # flower_name&flower_structure
+                # Flatten list[list[Tensor]] into list[Tensor] for all flowers across the batch
+                all_nas_ids: list[torch.Tensor] = []
+                all_nas_masks: list[torch.Tensor] = []
+                counts: list[int] = []
 
+                for ex in batch:
+                    nas_ids_list: list[torch.Tensor] = ex['input_ids_nas_list'][:OOM_LIMIT]
+                    nas_masks_list: list[torch.Tensor] = ex['attention_mask_nas_list'][:OOM_LIMIT]
+                    counts.append(len(nas_ids_list))
+                    all_nas_ids.extend(nas_ids_list)
+                    all_nas_masks.extend(nas_masks_list)
+
+                # Stack list[Tensor] vertically into two tensors of shape (total_flowers, seq_len)
+                stacked_nas_ids: torch.Tensor = torch.stack(all_nas_ids, dim=0).to(self.ml_components.tensor_device)
+                stacked_nas_masks: torch.Tensor = torch.stack(all_nas_masks, dim=0).to(self.ml_components.tensor_device)
+
+                # One forward pass for all flowers → (total_flowers, hidden_dim)
+                stacked_nas_embs: torch.Tensor = self.model(stacked_nas_ids, stacked_nas_masks)
+
+                # Split back by example and mean‐pool each chunk → List of (hidden_dim,)
+                agg_embs: list[torch.Tensor] = []
+                offset: int = 0
+                for c in counts:
+                    slice_emb: torch.Tensor = stacked_nas_embs[offset: offset + c]  # (c, hidden_dim)
+                    pooled_emb: torch.Tensor = slice_emb.mean(dim=0)  # (hidden_dim,)
+                    agg_embs.append(pooled_emb)
+                    offset += c
+
+                # Stack into final (batch_size, hidden_dim) tensor
+                emb_nas: torch.Tensor = torch.stack(agg_embs, dim=0)  # (batch, hidden_dim)
+
+                # Evaluations
                 # 1) Compute average contrastive loss on positives
-                target_pos = torch.ones(emb_left.shape[0], device=self.ml_components.tensor_device)
-                pos_loss = self.criterion(emb_left, emb_right, target_pos)
-                total_pos_loss += pos_loss.item() * emb_left.shape[0]
-                n_pos_examples += emb_left.shape[0]
+                target_pos = torch.ones(emb_nas.shape[0], device=self.ml_components.tensor_device)
+                pos_loss = self.criterion(emb_nas, emb_hfd, target_pos)
+                total_pos_loss += pos_loss.item() * emb_nas.shape[0]
+                n_pos_examples += emb_nas.shape[0]
 
                 # 2) Record cosine similarities on positives
-                cos_sim_pos = nn.functional.cosine_similarity(emb_left, emb_right, dim=-1)
+                cos_sim_pos = nn.functional.cosine_similarity(emb_nas, emb_hfd, dim=-1)
                 pos_cosines.extend(cos_sim_pos.cpu().tolist())
-
-                # 3) (Optional) Create negative pairs on the fly
-                if with_negatives:
-                    batch_size = emb_left.shape[0]
-
-                    # For each sample in this batch, randomly pick a different example from test_dataset
-                    neg_input_ids_left = []
-                    neg_mask_left = []
-                    neg_input_ids_right = []
-                    neg_mask_right = []
-
-                    # We need an “index_list” to know the global index of each example:
-                    #   make sure ContrastiveBertDataset returns {'index_list': idx_tensor} in __getitem__.
-                    # If you haven’t added that, negative sampling is trickier—
-                    # you’d need a separate “all_right_embeddings” cache, etc.
-
-                    for i in range(batch_size):
-                        pos_idx = batch['index_list'][i].item()
-                        neg_idx = pos_idx
-                        while neg_idx == pos_idx:
-                            neg_idx = torch.randint(0, len(self.test_dataset), (1,)).item()
-
-                        neg_example = self.test_dataset[neg_idx]
-                        neg_input_ids_left.append(neg_example['input_ids_left'])
-                        neg_mask_left.append(neg_example['attention_mask_left'])
-                        neg_input_ids_right.append(neg_example['input_ids_right'])
-                        neg_mask_right.append(neg_example['attention_mask_right'])
-
-                    neg_input_ids_left = torch.stack(neg_input_ids_left).to(self.ml_components.tensor_device)
-                    neg_mask_left = torch.stack(neg_mask_left).to(self.ml_components.tensor_device)
-                    neg_input_ids_right = torch.stack(neg_input_ids_right).to(self.ml_components.tensor_device)
-                    neg_mask_right = torch.stack(neg_mask_right).to(self.ml_components.tensor_device)
-
-                    neg_emb_left = self.model(neg_input_ids_left, neg_mask_left)
-                    neg_emb_right = self.model(neg_input_ids_right, neg_mask_right)
-
-                    cos_sim_neg = nn.functional.cosine_similarity(neg_emb_left, neg_emb_right, dim=-1)
-                    neg_cosines.extend(cos_sim_neg.cpu().tolist())
 
         # End no_grad()
 
@@ -189,20 +232,6 @@ class Trainer:
             'avg_pos_loss': round(avg_pos_loss, 6),
             'avg_pos_cosine': round(avg_pos_cosine, 6),
         }
-
-        if with_negatives:
-            avg_neg_cosine = float(np.mean(neg_cosines)) if neg_cosines else float('nan')
-            labels = [1] * len(pos_cosines) + [0] * len(neg_cosines)
-            scores = pos_cosines + neg_cosines
-            try:
-                roc_auc = roc_auc_score(labels, scores)
-            except ValueError:
-                roc_auc = float('nan')
-
-            metrics.update({
-                'avg_neg_cosine': round(avg_neg_cosine, 6),
-                'roc_auc': round(roc_auc, 6),
-            })
 
         if fqfn_metrics:
             with open(fqfn_metrics, 'w+') as fp:

@@ -32,7 +32,6 @@ class OptimizerConf:
 class TrainerConf:
     batch_size: int = 16
     epochs: int = 4
-    patience: int = 3  # Number of epochs to wait for improvement
     dataset_split_ratio: float = 0.2
     dataset_random_state: int | None = 42
 

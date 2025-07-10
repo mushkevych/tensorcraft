@@ -6,12 +6,12 @@ import torch
 
 from contrastivebert.classifier.contrastivebert_configuration import ModelConf
 from utils.bert_embeddings import encode_text_to_inputs
-from utils.lm_core import instantiate_ml_components, MODEL_BERT_BASE
+from utils.lm_core import instantiate_ml_components
 from utils.system_logger import logger
 
 
 class OnnxSession:
-    def __init__(self, model_path: str = MODEL_BERT_BASE):
+    def __init__(self, model_path: str):
         self.ml_components = instantiate_ml_components(model_path)
         model_file = path.join(path.dirname(__file__), 'ContrastiveSBERT.onnx')
         self.session = ort.InferenceSession(
@@ -29,7 +29,7 @@ class OnnxSession:
         then concatenate them into a single (batch_size, seq_len).
         Convert to NumPy and pass into ONNX. Finally, return the batch of pooled outputs.
         """
-        # Encode each form_and_field -> two tensors of shape (1, seq_len)
+        # Encode text body -> two tensors of shape (1, seq_len)
         input_tuples = [encode_text_to_inputs(self.ml_components, text) for text in text_bodies]
 
         # Concatenate along dim=0 to produce (batch_size, seq_len)
@@ -47,5 +47,5 @@ class OnnxSession:
                 'attention_mask': np_attention_mask,
             },
         )
-        # outputs[0].shape == (batch_size, hidden_size)
+        # outputs[0].shape == (batch_size, output_size)
         return outputs[0]

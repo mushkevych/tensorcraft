@@ -6,6 +6,8 @@ from torch import nn, device
 # pip install tensorboard
 from torch.utils.tensorboard import SummaryWriter
 
+from utils.system_logger import logger
+
 
 # pylint: disable = abstract-method
 class ModelWrapper(nn.Module):
@@ -41,17 +43,24 @@ def capture_model_architecture(model: nn.Module, t: torch.Tensor, writer: Summar
     writer.add_graph(ModelWrapper(model), input_to_model=sample)
 
 
-def clear_cuda_cache(compute_device: device) -> None:
-    if compute_device.type == 'cuda':
-        print(torch.cuda.get_device_name(0))
-        print('Memory Usage:')
-        print('Allocated:', round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1), 'GB')
-        print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
+def run_gc(supress_output: bool = True) -> None:
+    """ Run Python's Garbage Collector and cleans up GPU cache (if GPU is available) """
+    try:
+        gc.collect()
+    except Exception as e:
+        logger.error(f'ERROR while gc.collect(): {e}')
+
+    if torch.cuda.is_available():
+        if not supress_output:
+            logger.info(torch.cuda.memory_summary())
 
         torch.cuda.empty_cache()
-        gc.collect()
-        print('Post GC Allocated:', round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1), 'GB')
-        print('Post GC Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
+
+        if not supress_output:
+            logger.info('Cleaned CUDA cache')
+            logger.info(torch.cuda.memory_summary())
+    elif torch.mps.is_available():
+        torch.mps.empty_cache()
 
 
 def save_model_weights(model: nn.Module, file_path: str) -> None:
