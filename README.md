@@ -32,10 +32,7 @@ The `LlmAdapterProj` stands for an Adapter-based fine-tuning of the BERT model:
 
 `ContrastiveBert` illustrates contrastive learning of the BERT model, where "left" and "right" texts are embedded into the shared latent space:
   * [contrastivebert_classifier.ipynb](contrastivebert/contrastivebert_classifier.ipynb) tunes the model
-
-`Handbooks` represent common operations for Numpy/Pandas:
-  * [numpy_handbook.ipynb](handbooks/numpy_handbook.ipynb)
-  * [pandas_handbook.ipynb](handbooks/pandas_handbook.ipynb)
+  * [contrastivebert_indexer.ipynb](contrastivebert/contrastivebert_indexer.ipynb) HNSW Indexer
 
 
 Tensorboard instructions
