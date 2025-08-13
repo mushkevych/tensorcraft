@@ -25,12 +25,13 @@ def instantiate_ml_components(
     """
     Lazily create and cache LmComponents by model_name.
     A dict[str, LmComponents] is stored on this function as `.cache`.
+    NOTE: to clear the cache, call: `getattr(instantiate_ml_components, "cache", {}).clear()`
     """
     # Initialize the per-function cache dict if missing
-    cache: dict[str, LmComponents] = getattr(instantiate_ml_components, "cache", None)
+    cache: dict[str, LmComponents] = getattr(instantiate_ml_components, 'cache', None)
     if cache is None:
         cache = {}
-        setattr(instantiate_ml_components, "cache", cache)
+        setattr(instantiate_ml_components, 'cache', cache)
 
     # Instantiate on first request for this model_name, else return cached
     if model_name not in cache:
@@ -55,7 +56,7 @@ def instantiate_ft(model_name: str = FQFP_MODEL_FASTTEXT_D32) -> fasttext.FastTe
     cache: dict[str, fasttext.FastText] = getattr(instantiate_ft, 'cache', None)
     if cache is None:
         cache = {}
-        setattr(instantiate_ft, 'cache', cache)  # type: ignore[attr-defined]
+        setattr(instantiate_ft, 'cache', cache)
 
     if model_name not in cache:
         cache[model_name] = load_ft_model(model_name)
