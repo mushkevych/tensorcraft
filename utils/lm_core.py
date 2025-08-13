@@ -1,4 +1,5 @@
 from os import path
+from typing import Literal
 
 from utils.lm_components import MODEL_BERT_BASE, LmComponents, FQFP_MODEL_FASTTEXT_D32, load_ft_model, fasttext
 
@@ -14,23 +15,49 @@ def load_hf_token() -> str | None:
         return token
 
 
-# Global variables for multi-processing
-_ml_components = None
-_ft_model = None
 
+def instantiate_ml_components(
+    model_name: str = MODEL_BERT_BASE,
+    device_name: str | None = None,
+    compile_model: bool = False,
+    model_mode: Literal['eval', 'train'] = 'eval'
+) -> LmComponents:
+    """
+    Lazily create and cache LmComponents by model_name.
+    A dict[str, LmComponents] is stored on this function as `.cache`.
+    """
+    # Initialize the per-function cache dict if missing
+    cache: dict[str, LmComponents] = getattr(instantiate_ml_components, "cache", None)
+    if cache is None:
+        cache = {}
+        setattr(instantiate_ml_components, "cache", cache)
 
-def instantiate_ml_components(model_name: str = MODEL_BERT_BASE, device_name: str = None) -> LmComponents:
-    global _ml_components
-    if _ml_components is None:
-        # Only instantiate if it hasn't been done in this process
-        _ml_components = LmComponents(model_name=model_name, device_name=device_name)
-        _ml_components.load(hf_token=load_hf_token(), output_hidden_states=True)
-    return _ml_components
+    # Instantiate on first request for this model_name, else return cached
+    if model_name not in cache:
+        lm = LmComponents(model_name=model_name, device_name=device_name)
+        lm.load(
+            hf_token=load_hf_token(),
+            output_hidden_states=True,
+            compile_model=compile_model,
+            model_mode=model_mode,
+        )
+        cache[model_name] = lm
+
+    return cache[model_name]
 
 
 def instantiate_ft(model_name: str = FQFP_MODEL_FASTTEXT_D32) -> fasttext.FastText:
-    global _ft_model
-    if _ft_model is None:
-        # Only instantiate if it hasn't been done in this process
-        _ft_model = load_ft_model(model_name)
-    return _ft_model
+    """
+    Lazily create and cache FastText models by model_name.
+    A dict[str, fasttext.FastText] is stored on this function as `.cache`.
+    NOTE: to clear the cache, call: `getattr(instantiate_ft, "cache", {}).clear()`
+    """
+    cache: dict[str, fasttext.FastText] = getattr(instantiate_ft, 'cache', None)
+    if cache is None:
+        cache = {}
+        setattr(instantiate_ft, 'cache', cache)  # type: ignore[attr-defined]
+
+    if model_name not in cache:
+        cache[model_name] = load_ft_model(model_name)
+
+    return cache[model_name]

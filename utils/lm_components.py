@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from os import path, makedirs
-from typing import Optional
+from typing import Optional, Literal
 
 import fasttext
 import torch
@@ -39,11 +39,18 @@ class LmComponents:
         self.llm: Optional[nn.Module] = None
         self.tokenizer: Optional[PreTrainedTokenizer] = None
 
-    def load(self, hf_token: str = None, output_hidden_states: bool = True) -> None:
+    def load(self,
+        hf_token: str = None,
+        output_hidden_states: bool = True,
+        compile_model: bool = False,
+        model_mode: Literal['eval', 'train'] = 'eval'
+    ) -> None:
         """
         :param hf_token: Hugging Face token to retrieve models requiring authorization
         :param output_hidden_states: whether output hidden state of the last layer from the LLM
             NOTE: output_hidden_states is True by default, as it is required by `compute_code_embeddings` function
+        :param compile_model: whether to compile the model for faster inference; only applicable to non-XLA devices.
+        :param model_mode: whether to load the model in eval mode or train mode. Default is eval mode.
         """
         logger.info(f'LM Components are being loaded from {self.model_name}...')
         self.config = AutoConfig.from_pretrained(self.model_name, token=hf_token)
@@ -56,10 +63,23 @@ class LmComponents:
         else:
             self.llm = AutoModel.from_pretrained(self.model_name, config=self.config, token=hf_token)
             self.llm = self.llm.to(device=self.compute_device)
-            if torch.cuda.is_available():
-                self.llm.compile(mode='reduce-overhead')
 
-        self.llm.eval()
+            # compilation is not applicable to the model loaded from a TorchScript format
+            if compile_model:
+                self.llm.compile(
+                    backend='inductor',      # torch._dynamo.list_backends()
+                    mode='reduce-overhead',  # torch._inductor.list_mode_options()
+                    fullgraph=False,
+                )
+                logger.info(f'Model {self.model_name} successfully compiled.')
+
+        match model_mode:
+            case 'eval':
+                self.llm.eval()
+            case 'train':
+                self.llm.train()
+            case _:
+                raise RuntimeError(f'Unknown model mode {model_mode}')
 
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_name, config=self.config, token=hf_token, clean_up_tokenization_spaces=False
