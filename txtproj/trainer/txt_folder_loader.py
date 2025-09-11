@@ -4,7 +4,7 @@ from collections import Counter
 import pandas as pd
 from bs4 import BeautifulSoup
 
-from utils.text_helper import process_text, vectorize
+from utils.text_nlp_helper import process_text, vectorize
 from txtproj.classifier.txt_configuration import ModelConf
 
 

@@ -4,7 +4,7 @@ from os import path
 import numpy as np
 import onnxruntime as ort
 
-from utils.text_helper import process_text, vectorize
+from utils.text_nlp_helper import process_text, vectorize
 
 TEXT_SIZE_THRESHOLD = 256000
 
