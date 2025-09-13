@@ -24,9 +24,9 @@ WHITESPACE_ONLY_LINE_RE = re.compile(
 # from the Unicode General Punctuation block, plus the Ideographic Space.
 COMPREHENSIVE_HORIZONTAL_WHITESPACE_RE = re.compile(
     r'['
-    r' \t\u00A0'  # Standard space, tab, non-breaking space
-    r'\u2000-\u200A'  # En Quad, Em Quad, various typographic spaces
-    r'\u202F\u205F\u3000'  # Narrow No-Break Space, Medium Math Space, Ideographic Space
+    r' \t\u00A0'            # Standard space, tab, non-breaking space
+    r'\u2000-\u200A'        # En Quad, Em Quad, various typographic spaces
+    r'\u202F\u205F\u3000'   # Narrow No-Break Space, Medium Math Space, Ideographic Space
     r']+'
 )
 VERTICAL_WHITESPACE_RE = re.compile(r'[\n\r]+')
