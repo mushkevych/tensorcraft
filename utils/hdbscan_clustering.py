@@ -1,14 +1,15 @@
+import os
 import textwrap
-from dataclasses import dataclass, asdict, astuple
+from dataclasses import asdict, astuple
+from dataclasses import dataclass
 from typing import Any
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-
 # pip install umap-learn
 import umap
+
 from hdbscan import HDBSCAN
 
 
@@ -29,12 +30,12 @@ class UmapParams:
 
 def title_for_figure(text: str, figure: plt.Figure) -> str:
     # Get width of figure in pixels
-    fig_width_pixels = figure.get_figwidth() * figure.dpi
+    fig_width_pixels: int = int(figure.get_figwidth() * figure.dpi)
 
-    char_width_pixels = 30  # Empirical guess
+    char_width_pixels: int = 30  # Empirical guess
 
     # Estimate number of characters that fit the width
-    num_chars = fig_width_pixels // char_width_pixels
+    num_chars: int = fig_width_pixels // char_width_pixels
 
     title = textwrap.fill(text, width=max(num_chars, 48))
     # print(f'{num_chars} {title}')
@@ -58,7 +59,8 @@ def plot_2d(
 
     # Black removed and is used for noise instead.
     unique_labels = set(labels)
-    colors = [plt.cm.Spectral(each) for each in np.linspace(0, 1, len(unique_labels))]
+    cmap = plt.cm.get_cmap('Spectral')
+    colors = [cmap(each) for each in np.linspace(0, 1, len(unique_labels))]
     # The probability of a point belonging to its labeled cluster determines
     # the size of its marker
     proba_map = {idx: probabilities[idx] for idx in range(len(labels))}
@@ -103,7 +105,8 @@ def plot_3d(
 
     # Black removed and is used for noise instead.
     unique_labels = set(labels)
-    colors = [plt.cm.Spectral(each) for each in np.linspace(0, 1, len(unique_labels))]
+    cmap = plt.cm.get_cmap('Spectral')
+    colors = [cmap(each) for each in np.linspace(0, 1, len(unique_labels))]
 
     # The probability of a point belonging to its labeled cluster determines
     # the size of its marker
@@ -282,18 +285,126 @@ def plot_heatmap(
     fig.show()
 
 
+def _as_contiguous_float32(a: np.ndarray) -> np.ndarray:
+    """Best-effort normalize input to a contiguous float32 2D array.
+
+    This avoids (very expensive) `.tolist()` conversions, and gives downstream
+    libs (numba / sklearn / hdbscan) a consistent dtype/layout.
+    """
+    a = np.asarray(a)
+    if a.ndim != 2:
+        # If embeddings are stored as dtype=object of lists, callers should
+        # pass a proper 2D numeric matrix.
+        raise ValueError(f"embeddings_array must be a 2D numeric array; got shape={a.shape} dtype={a.dtype}")
+    if a.dtype != np.float32:
+        a = a.astype(np.float32, copy=False)
+    return np.ascontiguousarray(a)
+
+
+def _sanitize_reduction(Y: np.ndarray, *, clip: float | None = 1e6) -> np.ndarray:
+    # Ensure numeric dtype + contiguous memory (helps numba/sklearn/hdbscan)
+    Y = np.ascontiguousarray(np.asarray(Y, dtype=np.float32))
+
+    # Replace any NaN/Inf that might appear from UMAP edge cases
+    if not np.isfinite(Y).all():
+        Y = np.nan_to_num(
+            Y,
+            nan=0.0,
+            posinf=np.finfo(np.float32).max,
+            neginf=np.finfo(np.float32).min,
+        )
+
+    # Optional clamp to avoid extreme values feeding into distance computations
+    if clip is not None:
+        Y = np.clip(Y, -clip, clip)
+
+    return Y
+
+
 def clusterer(
     embeddings_array: np.ndarray,
     umap_n_neighbors: int = 15,
     umap_min_dist: float = 0.1,
     umap_metric: str = 'minkowski',
+    umap_metric_kwds: dict[str, Any] = None,
     umap_n_component: int = 5,
     umap_use_random_state: bool = True,
     cluster_selection_method='eom',
     cluster_min_size: int = 15,
     cluster_min_samples: int = 30,
     cluster_selection_epsilon: float = 0.2,
+    *,
+    n_jobs: int | None = None,
 ) -> tuple[HDBSCAN, float, float]:
+    """Run UMAP dimensionality reduction followed by HDBSCAN clustering.
+
+    Parameters
+    ----------
+    embeddings_array:
+        Input embedding matrix with shape ``(n_samples, n_features)``.
+        The function converts this to contiguous ``float32`` for performance.
+    umap_n_neighbors:
+        Size of the local neighborhood used by UMAP for manifold approximation.
+        Smaller values emphasize local structure; larger values preserve more
+        global structure.
+    umap_min_dist:
+        Effective minimum distance between points in UMAP output space.
+        Lower values create tighter clusters; higher values spread points out.
+    umap_metric:
+        Distance metric used by UMAP in the original embedding space
+        (for example ``"cosine"`` or ``"minkowski"``).
+    umap_metric_kwds:
+        Optional keyword arguments for ``umap_metric``. For example, when using
+        ``"minkowski"``, pass ``{"p": 2}`` for Euclidean-like distance.
+    umap_n_component:
+        Number of dimensions in the reduced UMAP space.
+        Use ``2`` or ``3`` for visualization, larger values (for example ``5``)
+        for downstream clustering fidelity.
+    umap_use_random_state:
+        If ``True``, UMAP is run with ``random_state=None`` (non-deterministic,
+        better parallel throughput). If ``False``, a fixed seed is used for more
+        reproducible runs.
+    cluster_selection_method:
+        HDBSCAN cluster extraction method. Common values are ``"eom"``
+        (default, broader/merged clusters) and ``"leaf"`` (finer clusters).
+    cluster_min_size:
+        Minimum number of points required to form a cluster in HDBSCAN.
+    cluster_min_samples:
+        Controls how conservative HDBSCAN is when labeling noise; higher values
+        usually produce more noise points and denser clusters.
+    cluster_selection_epsilon:
+        Extra epsilon threshold for cluster selection/merging in HDBSCAN.
+    n_jobs:
+        Number of CPU threads used by UMAP and HDBSCAN internals. If ``None``,
+        defaults to all detected CPU cores.
+
+    Returns
+    -------
+    tuple[HDBSCAN, float, float]
+        ``(hdb, coverage, dbcv)`` where:
+
+        - ``hdb`` is the fitted HDBSCAN model.
+        - ``coverage`` is the fraction of non-noise points
+          (labels greater than ``-1``).
+        - ``dbcv`` is ``hdb.relative_validity_`` (higher is generally better).
+
+    Notes
+    -----
+    - This pipeline is CPU-based; UMAP/HDBSCAN do not currently use Metal GPU
+      acceleration on macOS.
+    - Reduced embeddings are sanitized to contiguous ``float32`` and any NaN/Inf
+      values are replaced before clustering.
+    - In process-level parallel execution (for example
+      ``ProcessPoolExecutor``), keep per-process ``n_jobs`` low (often ``1``)
+      to avoid CPU oversubscription.
+    """
+
+    X = _as_contiguous_float32(embeddings_array)
+
+    # Default to using all cores unless the caller overrides.
+    if n_jobs is None:
+        n_jobs = int(os.cpu_count() or 1)
+
     if umap_use_random_state:
         # Use no seed for parallelism.
         random_state = None
@@ -302,23 +413,15 @@ def clusterer(
 
     reducer = umap.UMAP(
         random_state=random_state,
-
-        n_neighbors=umap_n_neighbors,   # The size of local neighborhood (in terms of number of neighboring sample points)
-                                        # used for manifold approximation
-
-
-        min_dist=umap_min_dist,     # The effective minimum distance between embedded points.
-                                    # Smaller values will result in a more clustered/clumped embedding where nearby points on the manifold
-                                    # are drawn closer together, while larger values will result on a more even dispersal of points.
-
+        n_neighbors=umap_n_neighbors,
+        min_dist=umap_min_dist,
         metric=umap_metric,
-
-        n_components=umap_n_component,  # The dimension of the space to embed into.
-                                        # This defaults to 2 to provide easy visualization,
-                                        # but can reasonably be set to any integer value in the range 2 to 100
-
+        metric_kwds=umap_metric_kwds,
+        n_components=umap_n_component,
+        n_jobs=n_jobs,
     )
-    reduced_embeddings = reducer.fit_transform(embeddings_array.tolist())
+    reduced_embeddings = reducer.fit_transform(X)
+    reduced_embeddings = _sanitize_reduction(reduced_embeddings)
 
     hdb = HDBSCAN(
         min_cluster_size=cluster_min_size,
@@ -326,7 +429,7 @@ def clusterer(
         cluster_selection_epsilon=cluster_selection_epsilon,
         cluster_selection_method=cluster_selection_method,  # 'eom' (Excess of Mass algorithm), 'leaf' (select the clusters at the leaves of the tree)
         gen_min_span_tree=True,
-        # approx_min_span_tree=False
+        core_dist_n_jobs=n_jobs,
     )
     hdb.fit(reduced_embeddings)
 
